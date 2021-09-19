@@ -19,7 +19,7 @@ library(foreach)                            # parallel computing
 
 # keras environment
 library(reticulate)                         # interface R and Python
-# use_condaenv("r-gpu", required = TRUE)      # conda env for running tf and keras
+use_condaenv("teste", required = TRUE)      # conda env for running tf and keras
 library(keras)
 library(tfdatasets)
 
@@ -27,7 +27,7 @@ library(tfdatasets)
 numberOfDigits <- 8
 options(digits = numberOfDigits)
 proportionTestSet <- 0.20
-numberOfEpochs    <- 1 #20                    # keras training parameter
+numberOfEpochs    <- 20                    # keras training parameter
 
 # error function
 errRMSE <- function(true_ratings, predicted_ratings){
@@ -264,6 +264,9 @@ build_model <- function() {
 }
 
 # train the model
+### remark:
+### the whole block from below can be commented if a pre-trained model is used
+
 print("train keras model")
 
 print_dot_callback <- callback_lambda(
@@ -271,7 +274,7 @@ print_dot_callback <- callback_lambda(
     if (epoch %% 80 == 0) cat("\n")
     cat(".")
   }
-)    
+)
 
 early_stop <- callback_early_stopping(monitor = "val_loss",
                                       min_delta = 1e-5,
@@ -291,9 +294,11 @@ history <- model %>% fit(
 plot(history)
 
 # save model
-print("save model")
-# model %>% save_model_tf("./models/keras_fit")
-model <- load_model_tf("./models/keras_fit")
+# print("save model")
+# model %>% save_model_tf("./model/", overwrite = FALSE)
+
+# load pre-built model
+# model2 <- load_model_tf("./model/")
 
 # predict
 print("predict testset results")
@@ -317,7 +322,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results
 
 # clean memory
-rm(df, df_train, p)
+rm(df, df_train, df_test, p)
 
 # validation
 # read dataset from csv

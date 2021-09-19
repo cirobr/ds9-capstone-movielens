@@ -1,0 +1,118 @@
+---
+title: "edX Capstone Movielens Project"
+author: "Ciro B Rosa"
+date: "19-Sep-2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Introduction and Objective
+
+This report is the result of the job performed on top of the "Movielens" dataset. The objective is to design a machine learning model that predicts movie ratings that would predict user's personal preferences on films at e.g. an online store. The level of efficiency of the model is measured as RMSE (Root Mean Square Error).
+
+
+### Before you Begin: Prepare the Environment
+This code has been tested on a Ubuntu 20.04 Linux Mate machine, besides the Anaconda package. To download and install Anaconda, please refer to the following page:
+
+* https://www.anaconda.com/products/individual-d
+
+First and foremost, please download the following project from the author's Github repository, as it contains the needed scripts for environment setup and execution of the project:
+
+* https://github.com/cirobr/ds9-capstone-movielens.git
+
+Next, a Conda environment has to be created for the specific purpose of hosting installation of Tensorflow libraries with the aid of the Keras-GPU package. This project uses Tensorflow at its last step and runs on GPU. The environment is created by typing on terminal:
+
+* conda create --name r-gpu python=3.9 r-base=4.1
+
+Next, please install Keras and all its dependencies by executing the R script on the file "install-keras-gpu.R". The script is very compact, and may take about five minutes to complete with installation at the "r-gpu" environment. For example, on a terminal window you can type:
+
+* Rscript install-keras-gpu.R
+
+The script is given below for illustrative purposes only:
+
+install.packages("reticulate")
+reticulate::use_condaenv("teste", required = TRUE)      # conda env for running tf and keras
+install.packages("keras-gpu")
+library(keras)
+install_keras(tensorflow = "gpu")
+
+Lastly, please execute the script "code-preset.R". Code is the one given by edX to generate the datasets, plus a few extra lines to store the files "edx.csv" and "validation.csv" on the subfolder "./dat".
+
+* Rscript code-preset.R
+
+At this point, the project code shall be ready for execution, for instance, on RStudio.
+
+* code-movielens.R
+
+
+### Code Organization and Project Development.
+
+The code is developed in such a way as to develop the following tasks in a logical sequence, as follows:
+
+* Setup libraries
+* Define key functions, such as to calculate RMSE
+* Read edX dataset, extract features and split on trainset / testset
+* Create, train and evaluate the model
+* Validate the model with the "validation" dataset and present the results.
+
+The report will present all relevant outputs, as appropriate, in order to evidence the steps taken on the development.
+
+
+### Project Development
+
+#### Setup Libraries
+
+```{r}
+# suppress warnings
+oldw <- getOption("warn")
+options(warn = -1)
+
+# environment
+print("setup environment")
+
+# one-function libraries
+# library(stringi)     # used as stringi::stri_sub()
+
+# libraries
+library(ggplot2)
+library(lubridate)
+library(tidyverse)
+library(caret)
+library(foreach)                            # parallel computing
+
+# keras environment
+library(reticulate)                         # interface R and Python
+use_condaenv("teste", required = TRUE)      # conda env for running tf and keras
+library(keras)
+library(tfdatasets)
+
+# global variables
+numberOfDigits <- 8
+options(digits = numberOfDigits)
+proportionTestSet <- 0.20
+numberOfEpochs    <- 20                    # keras training parameter
+
+# error function
+errRMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+
+# function: difference between timestamps in days
+daysBetweenTimestamps <- function(x,y){
+  difftime(as_date(as_datetime(x)), 
+           as_date(as_datetime(y)), 
+           units = c("days")) %>% 
+    as.numeric()
+}
+
+
+```
+
+```{r}
+
+```
+
