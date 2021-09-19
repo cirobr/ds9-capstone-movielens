@@ -1,0 +1,22 @@
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Python
+/.ipynb_checkpoints/*
+
+# qt-creator
+/build*
+CMakeLists.txt.user
+
+# C
+*.o
+*.out
+*.exe
+
+# datasets
+*.dat
+*.csv
+
