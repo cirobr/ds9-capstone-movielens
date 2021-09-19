@@ -51,6 +51,7 @@ edx <- rbind(edx, removed)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 
 # save datasets
+dir.create('./dat', showWarnings = FALSE)
 edx %>% as.data.frame() %>% write_csv(file = "./dat/edx.csv")
 validation %>% as.data.frame() %>% write_csv(file = "./dat/validation.csv")
 
