@@ -1,5 +1,3 @@
-# R version: 4.1.0
-
 # suppress warnings
 oldw <- getOption("warn")
 options(warn = -1)

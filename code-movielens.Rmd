@@ -112,7 +112,88 @@ daysBetweenTimestamps <- function(x,y){
 
 ```
 
+#### Read the edX dataset and extract features
+
+First and foremost, the edX dataset is loaded, whilst the validation dataset is removed to free execution memory and to ensure it is not used up to the very last project phase. Then, the edX dataset structure is presented.
+
 ```{r}
+# clean memory
+if(exists("validation")) {rm(validation)}
+
+# read dataset from csv
+print("pre-process edx")
+if(!exists("edx")) {edx <- read_csv(file = "./dat/edx.csv") %>% as_tibble()}
+head(edx)
+```
+
+At this point, it is worth to note a few features of the edX dataset, besides describing the aim of "feature extraction of the next phase.
+
+* For a given film, the Year of Release is embedded at the column "Title". The code will then extract the first information and delect the second, as the "Title" Column is reduntant to the more useful column "MovieId".
+
+* The corresponding year of the assessment done by a given user is extracted from the column "Timestamp" and stored at "timestampYear".
+
+* ***The time stamphen a given user had made his first assessment is also extracted and stored on "firstUserRating". Then, the distance (in days) between the first ever assessment and current assessment is also extracted and stored at "daysFromFirstUserRating".
+
+* Similarly
+
+* The column "genres" is a multiclass column that indicates the genre(s) of the movie that a given user has classified it. As such, the code will seek for all possible genres categories and will create a binary column for each of them.
+
+
+
+```{r}
+# move ratings to first column
+edx2 <- edx %>% select(-c(rating))
+edx2 <- cbind(rating = edx$rating, edx2)
+
+# extract yearOfRelease and timestampYear
+edx2 <- edx2 %>% 
+  select(-c(genres)) %>%
+  mutate(yearOfRelease = as.numeric(stringi::stri_sub(edx$title[1], -5, -2)),
+         timestampYear = year(as_datetime(timestamp)),
+         yearsFromRelease = timestampYear - yearOfRelease) %>%
+  select(-c(title, yearOfRelease, timestampYear)) 
+
+# extract firstUserRating
+dfFirstUserRating <- edx2 %>% group_by(userId) %>%
+  select(userId, timestamp) %>%
+  summarize(firstUserRating = min(timestamp))
+
+edx2 <- left_join(edx2, dfFirstUserRating)
+
+# extract firstMovieRating
+dfFirstMovieRating <- edx2 %>% group_by(movieId) %>%
+  select(movieId, timestamp) %>%
+  summarize(firstMovieRating = min(timestamp))
+
+edx2 <- left_join(edx2, dfFirstMovieRating)
+
+# extract daysFromFirstUserRating and daysFromFirstMovieRating
+edx2 <- edx2 %>% mutate(daysFromFirstUserRating  = daysBetweenTimestamps(timestamp, firstUserRating),
+                        daysFromFirstMovieRating = daysBetweenTimestamps(timestamp, firstMovieRating)) %>%
+  select(-c(timestamp, firstUserRating,firstMovieRating))
+
+# extract movie genres as predictors
+genres_names <- strsplit(edx$genres, "|", fixed = TRUE) %>%
+  unlist() %>%
+  unique()
+
+fn <- function(element_vector){
+  as.numeric(grepl(element_vector, vector))
+}
+
+vector <- edx$genres
+df <- sapply(genres_names, fn) %>% as_tibble()
+
+# remove hiphen from predictor names
+colnames(df)[7]  <- "SciFi"
+colnames(df)[16] <- "FilmNoir"
+colnames(df)[20] <- "NoGenre"
+
+edx2 <- bind_cols(edx2, df)
+head(edx2)
+
+# cleanup memory
+rm(df, edx, genres_names, vector, fn)
 
 ```
 
