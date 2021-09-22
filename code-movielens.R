@@ -4,28 +4,24 @@ options(warn = -1)
 
 # environment
 print("setup environment")
-
-# one-function libraries
-# library(stringi)     # used as stringi::stri_sub()
+library(reticulate)                         # interface R and Python
+use_condaenv("r-gpu", required = TRUE)      # conda env for running tf and keras on gpu
 
 # libraries
+# library(stringi)                          # used as stringi::stri_sub()
 library(ggplot2)
 library(lubridate)
 library(tidyverse)
 library(caret)
-library(foreach)                            # parallel computing
-
-# keras environment
-library(reticulate)                         # interface R and Python
-use_condaenv("teste", required = TRUE)      # conda env for running tf and keras
-library(keras)
+library(foreach)                            # multi-core computing for nzv()
+library(keras)                              # tensorflow wrap
 library(tfdatasets)
 
 # global variables
 numberOfDigits <- 8
 options(digits = numberOfDigits)
 proportionTestSet <- 0.20
-numberOfEpochs    <- 20                    # keras training parameter
+numberOfEpochs    <- 1 #20                    # keras training parameter
 
 # error function
 errRMSE <- function(true_ratings, predicted_ratings){
@@ -150,6 +146,7 @@ predicted <- mu
 err <- RMSE(test_set$rating, predicted)
 rmse_results <- tibble(model = "naiveAvg",
                        error = err)
+rmse_results
 
 # add movie bias effect
 df <- train_set %>%
@@ -164,12 +161,14 @@ head(dfBiasMovie)
 
 df <- left_join(test_set, dfBiasMovie) %>%
   select(rating, movieId, biasMovie)
+
 predicted = mu + df$biasMovie
 
 err <- RMSE(test_set$rating, predicted)
 rmse_results <- bind_rows(rmse_results,
                           tibble(model ="movieBias",
                                  error = err))
+rmse_results
 
 # add user bias effect
 df <- train_set %>%
@@ -192,8 +191,6 @@ err <- RMSE(test_set$rating, predicted)
 rmse_results <- bind_rows(rmse_results,
                           tibble(model ="userBias",
                                  error = err))
-
-# show RMSE results
 rmse_results
 
 # cleanup memory
@@ -234,7 +231,7 @@ df_test <- test_set %>%
   select(-c(rating, userId, movieId, biasMovie, biasUser))
 
 df_test <- df_test %>% select(-all_of(removedPredictors))
-
+stop()
 # wrap the model in a function
 print("build keras model")
 build_model <- function() {
@@ -262,9 +259,6 @@ build_model <- function() {
 }
 
 # train the model
-### remark:
-### the whole block from below can be commented if a pre-trained model is used
-
 print("train keras model")
 
 print_dot_callback <- callback_lambda(
