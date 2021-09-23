@@ -233,7 +233,7 @@ The model for prediction of movie ratings built with this code is a combination 
 
 The equation of the final prediction model will be calculated as follows:
 
-$$ prediction = naiveAverage + movieBias + userBias + neuralnetCalculation $$
+$$ prediction = naiveAverage + movieBias + userBias + neuralNetCalculation $$
 
 #### First model: Naive Average
 
@@ -246,7 +246,7 @@ As such, the average movie rating from the trainset is calculated and stored at 
 mu <- mean(train_set$rating)
 predicted <- mu
 err <- RMSE(test_set$rating, predicted)
-rmse_results <- tibble(model = "naiveAvg",
+rmse_results <- tibble(model = "naiveAverage",
                        error = err)
 rmse_results
 ```

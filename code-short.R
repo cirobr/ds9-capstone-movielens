@@ -36,6 +36,11 @@ daysBetweenTimestamps <- function(x,y){
     as.numeric()
 }
 
+# function: extract each genre from column genres
+extractGenresNames <- function(elementVector){
+  as.numeric(grepl(elementVector, genresVector))
+}
+
 # clean memory
 if(exists("validation")) {rm(validation)}
 
@@ -76,27 +81,23 @@ edx2 <- edx2 %>% mutate(daysFromFirstUserRating  = daysBetweenTimestamps(timesta
   select(-c(timestamp, firstUserRating,firstMovieRating))
 
 # extract movie genres as predictors
-genres_names <- strsplit(edx$genres, "|", fixed = TRUE) %>%
+genresNames <- strsplit(edx$genres, "|", fixed = TRUE) %>%
   unlist() %>%
   unique()
 
-fn <- function(element_vector){
-  as.numeric(grepl(element_vector, vector))
-}
-
-vector <- edx$genres
-df <- sapply(genres_names, fn) %>% as_tibble()
+genresVector <- edx$genres
+df <- sapply(genresNames, extractGenresNames) %>% as_tibble()
 
 # remove hiphen from predictor names
 colnames(df)[7]  <- "SciFi"
 colnames(df)[16] <- "FilmNoir"
 colnames(df)[20] <- "NoGenre"
 
-edx2 <- bind_cols(edx2, df)
+edx2 <- bind_cols(edx2, df, genresVector)
 head(edx2)
 
 # cleanup memory
-rm(df, edx, genres_names, vector, fn)
+rm(df, edx)
 
 # split train and test sets
 print("split edx in trainset/testset")
@@ -113,6 +114,15 @@ test_set <- test_set %>%
   semi_join(train_set, by = "movieId") %>%
   semi_join(train_set, by = "userId")
 
+# remove predictors with small variance
+nzv <- train_set %>%
+  select(-rating) %>%
+  nearZeroVar(foreach = TRUE, allowParallel = TRUE)
+
+removedPredictors <- colnames(train_set[,nzv])
+train_set <- train_set %>% select(-all_of(removedPredictors))
+test_set <- test_set %>% select(-all_of(removedPredictors))
+
 # check for stratification of train / test split
 p1 <- train_set %>%
   group_by(rating) %>%
@@ -127,7 +137,7 @@ p2 <- test_set %>%
 p <- bind_rows(p1, p2) %>% group_by(split)
 p %>% ggplot(aes(rating, qty, fill = split)) +
   geom_bar(stat="identity", position = "dodge") +
-  ggtitle("Stratification of Test_set / Train_set split")
+  ggtitle("Stratification of Testset / Trainset split")
 
 head(train_set)
 head(test_set)
@@ -141,7 +151,7 @@ print("bias predictions")
 mu <- mean(train_set$rating)
 predicted <- mu
 err <- RMSE(test_set$rating, predicted)
-rmse_results <- tibble(model = "naiveAvg",
+rmse_results <- tibble(model = "naiveAverage",
                        error = err)
 rmse_results
 
@@ -163,7 +173,7 @@ predicted = mu + df$biasMovie
 
 err <- RMSE(test_set$rating, predicted)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="movieBias",
+                          tibble(model ="naiveAverage + movieBias",
                                  error = err))
 rmse_results
 
@@ -187,7 +197,7 @@ predicted = mu + df$biasMovie + df$biasUser
 
 err <- RMSE(test_set$rating, predicted)
 rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="userBias",
+                          tibble(model ="naiveAverage + movieBias + userBias",
                                  error = err))
 rmse_results
 
@@ -197,20 +207,11 @@ rm(df, predicted)
 # prepare trainset
 print("pre-process trainset")
 df_train <- train_set %>%
-  ### select(rating:daysFromFirstMovieRating) %>%
   left_join(dfBiasMovie) %>%
   left_join(dfBiasUser) %>%
   mutate(deltaRating = (rating - mu - biasMovie - biasUser),
          .before = rating) %>%
   select(-c(rating, userId, movieId, biasMovie, biasUser))
-
-# remove predictors with small variance
-nzv <- df_train %>%
-  select(-deltaRating) %>%
-  nearZeroVar(foreach = TRUE, allowParallel = TRUE)
-
-removedPredictors <- colnames(df_train[,nzv])
-df_train <- df_train %>% select(-all_of(removedPredictors))
 
 # scale predictors
 spec <- feature_spec(df_train, deltaRating ~ . ) %>% 
@@ -218,18 +219,8 @@ spec <- feature_spec(df_train, deltaRating ~ . ) %>%
   fit()
 spec
 
-#####
-stop()
-#####
-
-# prepare testset
-print("pre-process testset")
-df_test <- test_set %>%
-  left_join(dfBiasMovie) %>%
-  left_join(dfBiasUser) %>%
-  mutate(deltaRating = (rating - mu - biasMovie - biasUser),
-         .before = rating) %>%
-  select(-c(rating))
+# clean memory
+rm(train_set)
 
 # wrap the model in a function
 print("build keras model")
@@ -239,7 +230,8 @@ build_model <- function() {
   
   output <- input %>% 
     layer_dense_features(dense_features(spec)) %>% 
-    layer_dense(units = 8, activation = "relu") %>%
+    layer_dense(units = 16, activation = "relu") %>%
+    layer_dense(units = 16, activation = "relu") %>%
     layer_dense(units = 8, activation = "relu") %>%
     layer_dense(units = 1) 
   
@@ -284,75 +276,41 @@ history <- model %>% fit(
 
 plot(history)
 
+# prepare testset
+print("pre-process testset")
+df_test <- test_set %>%
+  left_join(dfBiasMovie) %>%
+  left_join(dfBiasUser) %>%
+  mutate(deltaRating = (rating - mu - biasMovie - biasUser),
+         .before = rating) %>%
+  select(-c(rating, userId, movieId, biasMovie, biasUser))
+
 # predict
 print("predict testset results")
-p <- model %>% predict(df_test %>% select(-deltaRating))
-p <- p[ , 1]
+neuralNetPrediction <- model %>% predict(df_test %>% select(-deltaRating))
+neuralNetPrediction <- neuralNetPrediction[ , 1]
 
 df <- test_set %>%
   select(userId, movieId) %>%
   left_join(dfBiasMovie) %>%
   left_join(dfBiasUser) %>%
-  mutate(predicted = mu + biasMovie + biasUser + p)
+  mutate(predicted = mu + biasMovie + biasUser + neuralNetPrediction)
 
 # calculate error metrics
 err <- errRMSE(test_set$rating, df$predicted)
 
 rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="keras",
+                          tibble(model ="fullModel",
                                  error = err))
-
-# show RMSE results
 rmse_results
 
 # clean memory
-rm(df, df_train, df_test, p)
+# rm(test_set, df, df_train, df_test, neuralNetPrediction)
 
-# validation
-# read dataset from csv
-print("predict validation results")
-validation <- read_csv(file = "./dat/validation.csv") %>% as_tibble()
-head(validation)
 
-validation <- validation %>%
-  semi_join(train_set, by = "movieId") %>%
-  semi_join(train_set, by = "userId")
 
-df_val <- validation %>%
-  select(-c(genres)) %>%
-  mutate(yearOfRelease = as.numeric(stringi::stri_sub(validation$title[1], -5, -2)),
-         timestampYear = year(as_datetime(timestamp)),
-         yearsFromRelease = timestampYear - yearOfRelease) %>%
-  select(-c(rating, title, yearOfRelease, timestampYear)) %>%
-  left_join(dfFirstMovieRating) %>%
-  left_join(dfFirstUserRating) %>%
-  mutate(daysFromFirstUserRating  = daysBetweenTimestamps(timestamp, firstUserRating),
-         daysFromFirstMovieRating = daysBetweenTimestamps(timestamp, firstMovieRating)) %>%
-  select(-c(userId, movieId, timestamp, firstUserRating,firstMovieRating))
-head(df_val)
 
-p <- model %>% predict(df_val)
-p <- p[ , 1]
 
-df <- validation %>%
-  left_join(dfBiasMovie) %>%
-  left_join(dfBiasUser) %>%
-  mutate(predicted = mu + biasMovie + biasUser + p)
-
-err <- errRMSE(validation$rating, df$predicted)
-
-rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="validation",
-                                 error = err))
-
-# show RMSE results
-print("project results")
-rmse_results
-err
-
-# clean memory
-rm(df, df_test, df_val)
-rm(train_set, test_set, validation)
 
 # restore warnings
 print("job done")
