@@ -53,7 +53,7 @@ head(edx)
 edx2 <- edx %>% select(-c(rating))
 edx2 <- cbind(rating = edx$rating, edx2)
 
-# extract yearOfRelease and timestampYear
+# extract yearsFromRelease
 edx2 <- edx2 %>% 
   select(-c(genres)) %>%
   mutate(yearOfRelease = as.numeric(stringi::stri_sub(edx$title[1], -5, -2)),
@@ -93,7 +93,7 @@ colnames(df)[7]  <- "SciFi"
 colnames(df)[16] <- "FilmNoir"
 colnames(df)[20] <- "NoGenre"
 
-edx2 <- bind_cols(edx2, df, genresVector)
+edx2 <- bind_cols(edx2, df)
 head(edx2)
 
 # cleanup memory
@@ -305,7 +305,7 @@ rmse_results <- bind_rows(rmse_results,
 rmse_results
 
 # clean memory
-# rm(test_set, df, df_train, df_test, neuralNetPrediction)
+rm(test_set, df, df_train, df_test, neuralNetPrediction)
 
 
 
