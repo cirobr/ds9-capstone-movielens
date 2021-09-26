@@ -39,26 +39,24 @@ df_val <- df_val %>%
          .before = rating) %>%
   select(-c(rating, userId, movieId, biasMovie, biasUser))
 
-head(df_val)
-class(df_val)
-
 # predict
 neuralNetPrediction <- model %>% predict(df_val %>% select(-deltaRating))
 neuralNetPrediction <- neuralNetPrediction[ , 1]
-stop()
+
 df <- validation %>%
   select(userId, movieId) %>%
   left_join(dfBiasMovie) %>%
   left_join(dfBiasUser) %>%
   mutate(predicted = mu + biasMovie + biasUser + neuralNetPrediction)
-
-stop()
+validRows <- !is.na(df$predicted)
 
 # calculate error metrics
-err <- errRMSE(test_set$rating, df$predicted)
+err <- errRMSE(validation$rating[validRows], df$predicted[validRows])
 
 rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="fullModel + validation set",
+                          tibble(model ="fullModel validation",
                                  error = err))
 rmse_results
 
+# clean memory
+rm(df, df_val, validation)
