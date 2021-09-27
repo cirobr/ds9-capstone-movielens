@@ -96,7 +96,7 @@ colnames(df)[20] <- "NoGenre"
 edx2 <- bind_cols(edx2, df)
 head(edx2)
 
-# cleanup memory
+# clean memory
 rm(df, edx)
 
 # split train and test sets
