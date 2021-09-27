@@ -18,7 +18,7 @@ library(keras)                              # tensorflow wrap
 library(tfdatasets)
 
 # global variables
-numberOfDigits <- 8
+numberOfDigits <- 5
 options(digits = numberOfDigits)
 proportionTestSet <- 0.20
 numberOfEpochs    <- 20                    # keras training parameter
@@ -109,20 +109,6 @@ test_index <- createDataPartition(edx2$rating,
 test_set <- edx2 %>% slice(test_index)
 train_set <- edx2 %>% slice(-test_index)
 
-# remove movies and users from testset that are not present on trainset
-test_set <- test_set %>%
-  semi_join(train_set, by = "movieId") %>%
-  semi_join(train_set, by = "userId")
-
-# remove predictors with small variance
-nzv <- train_set %>%
-  select(-rating) %>%
-  nearZeroVar(foreach = TRUE, allowParallel = TRUE)
-
-removedPredictors <- colnames(train_set[,nzv])
-train_set <- train_set %>% select(-all_of(removedPredictors))
-test_set <- test_set %>% select(-all_of(removedPredictors))
-
 # check for stratification of train / test split
 p1 <- train_set %>%
   group_by(rating) %>%
@@ -139,11 +125,27 @@ p %>% ggplot(aes(rating, qty, fill = split)) +
   geom_bar(stat="identity", position = "dodge") +
   ggtitle("Stratification of Testset / Trainset split")
 
+# remove movies and users from testset that are not present on trainset
+test_set <- test_set %>%
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId")
+
+# remove predictors with small variance
+nzv <- train_set %>%
+  select(-rating) %>%
+  nearZeroVar(foreach = TRUE, allowParallel = TRUE)
+removedPredictors <- colnames(train_set[,nzv])
+removedPredictors
+
+train_set <- train_set %>% select(-all_of(removedPredictors))
+test_set <- test_set %>% select(-all_of(removedPredictors))
+
 # cleanup memory
 rm(edx2, test_index)
 rm(p, p1, p2)
 
-# predict by global average
+
+### predict by global average
 print("bias predictions")
 mu <- mean(train_set$rating)
 predicted <- mu
@@ -152,83 +154,56 @@ rmse_results <- tibble(model = "naiveAverage",
                        error = err)
 rmse_results
 
-# add movie bias effect
-df <- train_set %>%
-  group_by(movieId) %>%
-  summarize(deltaRating = mean(rating - mu))
 
-dfBiasMovie <- left_join(train_set, df) %>%
-  select(rating, movieId, deltaRating) %>%
+### predict by CNN model
+
+# add movie bias effect
+dfBiasMovie <- train_set %>%
+  select(rating, movieId) %>%
   group_by(movieId) %>%
-  summarize(biasMovie = mean(deltaRating))
+  summarize(biasMovie = mean(rating))
 head(dfBiasMovie)
 
-df <- left_join(test_set, dfBiasMovie) %>%
-  select(rating, movieId, biasMovie)
-
-predicted = mu + df$biasMovie
-
-err <- RMSE(test_set$rating, predicted)
-rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="naiveAverage + movieBias",
-                                 error = err))
-rmse_results
-
 # add user bias effect
-df <- train_set %>%
-  left_join(dfBiasMovie) %>%
+dfBiasUser <- train_set %>%
+  select(rating, userId) %>%
   group_by(userId) %>%
-  summarize(deltaRating = mean(rating - mu - biasMovie))
-
-dfBiasUser <- left_join(train_set, df) %>%
-  select(rating, userId, movieId, deltaRating) %>%
-  group_by(userId) %>%
-  summarize(biasUser = mean(deltaRating))
+  summarize(biasUser = mean(rating))
 head(dfBiasUser)
 
-df <- left_join(test_set, dfBiasMovie) %>%
+df_train <- train_set %>% 
+  left_join(dfBiasMovie) %>% 
   left_join(dfBiasUser) %>%
-  select(rating, movieId, userId, biasMovie, biasUser)
+  as_tibble()
 
-predicted = mu + df$biasMovie + df$biasUser
-
-err <- RMSE(test_set$rating, predicted)
-rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="naiveAverage + movieBias + userBias",
-                                 error = err))
-rmse_results
-
-# cleanup memory
-rm(df, predicted)
-
-# prepare trainset
-print("pre-process trainset")
-df_train <- train_set %>%
+df_test <- test_set %>%
   left_join(dfBiasMovie) %>%
   left_join(dfBiasUser) %>%
-  mutate(deltaRating = (rating - mu - biasMovie - biasUser),
-         .before = rating) %>%
-  select(-c(rating, userId, movieId, biasMovie, biasUser))
+  as_tibble()
+
+head(df_train)
+
+# clean memory
+rm(train_set, test_set)
 
 # scale predictors
-spec <- feature_spec(df_train, deltaRating ~ . ) %>% 
+spec <- feature_spec(df_train, rating ~ . ) %>% 
   step_numeric_column(all_numeric(), normalizer_fn = scaler_standard()) %>% 
   fit()
 spec
 
-# clean memory
-rm(train_set)
-
 # wrap the model in a function
-print("build keras model")
+print("build cnn model")
 build_model <- function() {
   # create model
-  input <- layer_input_from_dataset(df_train %>% select(-deltaRating))
+  input <- layer_input_from_dataset(df_train %>% select(-c(rating)))
   
   output <- input %>% 
     layer_dense_features(dense_features(spec)) %>% 
+    layer_dense(units = 32, activation = "relu") %>%
     layer_dense(units = 16, activation = "relu") %>%
     layer_dense(units = 16, activation = "relu") %>%
+    layer_dense(units = 8, activation = "relu") %>%
     layer_dense(units = 8, activation = "relu") %>%
     layer_dense(units = 1) 
   
@@ -247,7 +222,7 @@ build_model <- function() {
 }
 
 # train the model
-print("train keras model")
+print("train cnn model")
 
 print_dot_callback <- callback_lambda(
   on_epoch_end = function(epoch, logs) {
@@ -259,51 +234,35 @@ print_dot_callback <- callback_lambda(
 early_stop <- callback_early_stopping(monitor   = "val_loss",
                                       min_delta = 1e-5,
                                       patience  = 5,
-                                      mode      = "min")
-
+                                      mode      = "min",
+                                      restore_best_weights = TRUE)
 model <- build_model()
 
 history <- model %>% fit(
-  x = df_train %>% select(-deltaRating),
-  y = df_train$deltaRating,
+  x = df_train %>% select(-c(rating)),
+  y = df_train$rating,
   epochs = numberOfEpochs,
   validation_split = 0.2,
   verbose = 0,
   callbacks = list(early_stop, print_dot_callback)
 )
-
 plot(history)
-
-# prepare testset
-print("pre-process testset")
-df_test <- test_set %>%
-  left_join(dfBiasMovie) %>%
-  left_join(dfBiasUser) %>%
-  mutate(deltaRating = (rating - mu - biasMovie - biasUser),
-         .before = rating) %>%
-  select(-c(rating, userId, movieId, biasMovie, biasUser))
 
 # predict
 print("predict testset results")
-neuralNetPrediction <- model %>% predict(df_test %>% select(-deltaRating))
-neuralNetPrediction <- neuralNetPrediction[ , 1]
-
-df <- test_set %>%
-  select(userId, movieId) %>%
-  left_join(dfBiasMovie) %>%
-  left_join(dfBiasUser) %>%
-  mutate(predicted = mu + biasMovie + biasUser + neuralNetPrediction)
+predicted <- model %>% predict(df_test %>% select(-c(rating)))
+predicted <- predicted[ , 1]
 
 # calculate error metrics
-err <- errRMSE(test_set$rating, df$predicted)
+err <- errRMSE(df_test$rating, predicted)
 
 rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="fullModel",
+                          tibble(model ="CNN",
                                  error = err))
 rmse_results
 
 # clean memory
-rm(test_set, df, df_train, df_test, neuralNetPrediction)
+rm(df_train, df_test)
 
 
 # final step: validation
@@ -334,40 +293,30 @@ df <- sapply(genresNames, extractGenresNames) %>% as_tibble()
 colnames(df)[7]  <- "SciFi"
 colnames(df)[16] <- "FilmNoir"
 colnames(df)[20] <- "NoGenre"
-
 df_val <- bind_cols(df_val, df)
+
 df_val <- df_val %>% 
   select(-all_of(removedPredictors)) %>%
-  as_tibble()
-
-df_val <- df_val %>%
   left_join(dfBiasMovie) %>%
   left_join(dfBiasUser) %>%
-  mutate(deltaRating = (rating - mu - biasMovie - biasUser),
-         .before = rating) %>%
-  select(-c(rating, userId, movieId, biasMovie, biasUser))
+  as_tibble()
+head(df_val)
 
 # predict
-neuralNetPrediction <- model %>% predict(df_val %>% select(-deltaRating))
-neuralNetPrediction <- neuralNetPrediction[ , 1]
-
-df <- validation %>%
-  select(userId, movieId) %>%
-  left_join(dfBiasMovie) %>%
-  left_join(dfBiasUser) %>%
-  mutate(predicted = mu + biasMovie + biasUser + neuralNetPrediction)
-validRows <- !is.na(df$predicted)
+predicted <- model %>% predict(df_val %>% select(-c(rating)))
+predicted <- predicted[ , 1]
+validRows <- !is.na(predicted)
 
 # calculate error metrics
-err <- errRMSE(validation$rating[validRows], df$predicted[validRows])
+err <- errRMSE(df_val$rating[validRows], predicted[validRows])
 
 rmse_results <- bind_rows(rmse_results,
-                          tibble(model ="fullModel validation",
+                          tibble(model ="CNN validation",
                                  error = err))
 rmse_results
 
 # clean memory
-rm(df, df_val, validation, neuralNetPrediction, validRows)
+rm(df, df_val, validation, predicted, validRows)
 
 
 # restore warnings
