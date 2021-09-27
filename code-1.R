@@ -139,9 +139,6 @@ p %>% ggplot(aes(rating, qty, fill = split)) +
   geom_bar(stat="identity", position = "dodge") +
   ggtitle("Stratification of Testset / Trainset split")
 
-head(train_set)
-head(test_set)
-
 # cleanup memory
 rm(edx2, test_index)
 rm(p, p1, p2)
