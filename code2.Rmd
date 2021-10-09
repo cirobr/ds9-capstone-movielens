@@ -5,58 +5,15 @@ date: "27-Sep-2021"
 output: html_document
 ---
 
-### Introduction and Objective
-
-This report is the result of the job performed on the "Movielens" dataset. The objective is to design a machine learning model that predicts movie ratings for a given user that has not previously seen that movie, based on data such as previous ratings to other movies, user's preferences, etc. The level of efficiency of the model is measured as RMSE (Root Mean Square Error), which means the lowest it the best.
-
-### Before you Begin: Prepare the Environment
-This code has been tested on a specific Anaconda environment created under Ubuntu 20.04 Linux Mate machine. All necessary scripts can be downloaded from the student's GitHub:
-
-* https://github.com/cirobr/ds9-capstone-movielens.git
-
-Next, the user should download and install Anaconda. With this package, we will create an isolated environment with the necessary packages, thus not interferring with the main packages of the PC:
-
-* https://www.anaconda.com/products/individual-d
-
-Now it is time to create an environment named "r-gpu" with the help of two command lines:
-
-* conda create --name r-gpu python=3.9 notebook r-base=4.1 r-essentials r-e1071 r-irkernel r-varhandle r-foreach r-doparallel r-reticulate r-keras r-tfdatasets
-
-* Rscript install-keras-gpu.R
-
-Lastly, the below script executes the code provided by edX to generate the datasets and stores the files "edx.csv" and "validation.csv" on the subfolder "./dat".
-
-* Rscript code-preset.R
-
-At this point, the code is ready for execution, for instance, on RStudio, through this script:
-
-* code-movielens.R
-
-
-### Code Organization and Project Development.
-
-The code is developed in such a way as to execute the following tasks:
-
-* Setup environment, libraries and define key functions, such as to calculate RMSE;
-* Read the edX dataset and split it on trainset / testset;
-* Create, train and evaluate the model (naive average and neural network);
-* Validate the model with the "validation" data set, and present the results.
-
-The report will present all relevant outputs, as appropriate, in order to evidence the steps taken.
-
-
-### Project Development
-
-#### Setup environment
 
 ```{r}
 # environment
 print("setup environment")
-library(reticulate)                         # interface R / Python
+library(reticulate)                         # interface R and Python
 use_condaenv("r-gpu", required = TRUE)      # conda env for running tf and keras on gpu
 
 # libraries
-# library(stringi)                          # used on the code as stringi::stri_sub()
+# library(stringi)                          # used as stringi::stri_sub()
 library(ggplot2)
 library(lubridate)
 library(tidyverse)
@@ -69,7 +26,7 @@ library(tfdatasets)
 numberOfDigits <- 5
 options(digits = numberOfDigits)
 proportionTestSet <- 0.20
-numberOfEpochs    <- 1 #20                    # keras training parameter
+numberOfEpochs    <- 20                    # keras training parameter
 
 # error function
 errRMSE <- function(true_ratings, predicted_ratings){
@@ -88,13 +45,7 @@ daysBetweenTimestamps <- function(x,y){
 extractGenresNames <- function(elementVector){
   as.numeric(grepl(elementVector, genresVector))
 }
-```
 
-#### Read and pre-process the edX dataset
-
-In order to ensure the "validation" data set is not handled at all at th training stage, it is deleted from memory. Please recall that its correspondent CSV file is stored on hard drive. Next, the "edx" data set is loaded to memory.
-
-```{r}
 # clean memory
 if(exists("validation")) {rm(validation)}
 
@@ -102,19 +53,7 @@ if(exists("validation")) {rm(validation)}
 print("pre-process edx")
 if(!exists("edx")) {edx <- read_csv(file = "./dat/edx.csv") %>% as_tibble()}
 head(edx)
-```
 
-Next, the following predictors will be extracted from the edX data set:
-
-* "yearsFromRelease" is a predictor that indicates the number of years between film release and timestamp of evaluation. The year of release of the film is extracted as "yearOfRelease" from the "title" column.
-
-* "daysFromFirstUserRating" is a predictor that indicates the number of days between the first assessment from a given user and the timestamp of assessment made by the same user. The first assessment from each user is a temporary variable.
-
-* "daysFromFirstMovieRating" is similar to the above predictor. It gives the number of days between the first assessment a given movie has received, and the timestamp of the evaluation for that same movie. The first assessment granted for each movie is also a temporary variable.
-
-* The column "genres" is a multiclass column that indicates the genre(s) of the movie that a given user has classified it. The code seeks for the available genres categories and creates a binary column for each of them.
-
-```{r}
 # move ratings to first column
 edx2 <- edx %>% select(-c(rating))
 edx2 <- cbind(rating = edx$rating, edx2)
@@ -164,13 +103,7 @@ head(edx2)
 
 # clean memory
 rm(df, edx)
-```
 
-#### Split the edX dataset and check for stratification
-
-Next, the "edX" data set is split on trainset and testset. The resulting tables are then  verified for its correct stratification, with the aid of a chart that demonstrates the data splitting has also split each movie rating category, ranging between [0.5; 5.0], at approximately the same 80% trainset / 20% testset proportion.
-
-```{r}
 # split train and test sets
 print("split edx in trainset/testset")
 set.seed(1, sample.kind = "Rounding")
@@ -196,13 +129,7 @@ p <- bind_rows(p1, p2) %>% group_by(split)
 p %>% ggplot(aes(rating, qty, fill = split)) +
   geom_bar(stat="identity", position = "dodge") +
   ggtitle("Stratification of Testset / Trainset split")
-```
 
-#### Pre processing of trainset
-
-The trainset is now pre processed for dimensionality reduction by eliminating the small variance predictors. This step is important as to reduce computational workload at the neual network processing steps.
-
-```{r}
 # remove movies and users from testset that are not present on trainset
 test_set <- test_set %>%
   semi_join(train_set, by = "movieId") %>%
@@ -221,12 +148,8 @@ test_set <- test_set %>% select(-all_of(removedPredictors))
 # cleanup memory
 rm(edx2, test_index)
 rm(p, p1, p2)
-```
 
-#### First model: Naive Average
 
-Next, the naive average model is built as a baseline figure of merit forthe project, which means that further processing is expected to, as a minimum, to deliver performance better than achieved at this phase.
-```{r}
 ### predict by global average
 print("bias predictions")
 mu <- mean(train_set$rating)
@@ -235,16 +158,10 @@ err <- RMSE(test_set$rating, predicted)
 rmse_results <- tibble(model = "naiveAverage",
                        error = err)
 rmse_results
-```
-
-#### Dataset preparation for CNN
-
-The below code is a pre-processing of data for the forthcoming CNN (Convolutional Neural Network) data analysis. The following steps are taken:
-
-* A "movie bias" and "user bias" indexes are extracted, hen merged to the train/test sets. The idea of extracting such features might allow the model to capture the "taste" of users to e.g. blockbusters, among others
 
 
-```{r}
+### predict by CNN model
+
 # add movie bias effect
 dfBiasMovie <- train_set %>%
   select(rating, movieId) %>%
@@ -273,26 +190,15 @@ head(df_train)
 
 # clean memory
 rm(train_set, test_set)
-```
 
-#### Second model: CNN
+# scale predictors
+spec <- feature_spec(df_train, rating ~ . ) %>% 
+  step_numeric_column(all_numeric(), normalizer_fn = scaler_standard()) %>% 
+  fit()
+spec
 
-The code presented next takes the necessary steps to configure, compile, train and test a CNN (Convolutional Neural Network) model. This student has chosen to go through this way as a novel approach, in the sense that it has not been exploited at all in classes. An excellent online lecture about the theory behind neural networks can be found here:
-
-* https://youtu.be/Ih5Mr93E-2c
-
-The baseline package used for training the model is "Keras", which is a wrap for "Tensorflow". The technical reference for the programming with the package is found at the following links:
-
-* https://cran.r-project.org/web/packages/keras/vignettes/index.html
-* https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/
-* https://datascience.stackexchange.com/questions/57171/how-to-improve-low-accuracy-keras-model-design/57292
-
-The Keras package offers a variety of activation functions for its neurons. However, as the package may consume a significant amount of computer resources, this project will focus only on "Relu" activation function, and will not conduct a grid search among several activation functions. 
-
-Please note that the code can take +2h before it ends at an relatively usual Intel core i7 machine with GPU. At the end, the validation of result on each epoch is presented on a chart:
-
-```{r}
 # wrap the model in a function
+print("build cnn model")
 build_model <- function() {
   # create model
   input <- layer_input_from_dataset(df_train %>% select(-c(rating)))
@@ -321,6 +227,8 @@ build_model <- function() {
 }
 
 # train the model
+print("train cnn model")
+
 print_dot_callback <- callback_lambda(
   on_epoch_end = function(epoch, logs) {
     if (epoch %% 80 == 0) cat("\n")
@@ -344,11 +252,7 @@ history <- model %>% fit(
   callbacks = list(early_stop, print_dot_callback)
 )
 plot(history)
-```
 
-The prediction on the validation set is now performed, with an outcome RMSE at around 0.880.
-
-```{r}
 # predict
 print("predict testset results")
 predicted <- model %>% predict(df_test %>% select(-c(rating)))
@@ -364,15 +268,9 @@ rmse_results
 
 # clean memory
 rm(df_train, df_test)
-```
 
-#### Validation: The Final Step
 
-Given that we have a tested model, it is time to validate it. The "validation" dataset is now recovered and pre-processed for use, then the predictions are made over it.
-
-The validation set needs to be pre-processed before being used on predictions. This is accomplished in a similar way as for the trainset/testset before:
-
-```{r}
+# final step: validation
 # read dataset from csv
 print("predict validation results")
 validation <- read_csv(file = "./dat/validation.csv") %>% as_tibble()
@@ -425,9 +323,4 @@ rmse_results
 # clean memory
 rm(df, df_val, validation, predicted, validRows)
 ```
-
-### Conclusions
-
-### Next steps / Future work
-
 
