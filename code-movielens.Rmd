@@ -1,7 +1,7 @@
 ---
 title: "edX Capstone Movielens Project"
 author: "Ciro B Rosa"
-date: "27-Sep-2021"
+date: "10-Oct-2021"
 output:
   word_document: default
   pdf_document: default
@@ -429,7 +429,7 @@ rmse_results
 rm(df, df_val, validation, predicted, validRows)
 ```
 
-### Conclusions
+### Conclusion
 
 The student has demonstrated he has learned several skills from the classes that enabled him to pre-process data and exploit by himself the topic of "neural networks", that has not been covered during the course, and reaching to an RMSE of around 0.880, which is a significant improvement from the naive average approach.
 
