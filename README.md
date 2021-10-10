@@ -16,7 +16,7 @@ Now, it is time to create an environment named "r-gpu" with the help of two comm
 
 * Rscript install-keras-gpu.R
 
-Lastly, the below script executed on RStudio runs the code provided by edX to generate the datasets and stores the files "edx.csv" and "validation.csv" on a sub-folder "./dat", which is also created in the process:
+Lastly, the below script executed on RStudio runs the code provided by edX to generate the datasets, and stores the files "edx.csv" and "validation.csv" on a sub-folder "./dat", which is also created in the process:
 
 * code-preset.R
 
