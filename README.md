@@ -1,4 +1,7 @@
-### Before you Begin: Prepare the Environment
+## edX Movielens Project
+
+### Important: Installation instructions
+
 This code has been tested on a specific Anaconda environment created on a Ubuntu 20.04 Linux Mate machine. All necessary scripts can be downloaded from the student's GitHub:
 
 * https://github.com/cirobr/ds9-capstone-movielens.git
