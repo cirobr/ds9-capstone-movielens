@@ -2,7 +2,7 @@
 title: "edX Capstone Movielens Project"
 author: "Ciro B Rosa"
 date: "27-Sep-2021"
-output: html_document
+output: pdf_document
 ---
 
 ### Introduction and Objective
@@ -10,25 +10,25 @@ output: html_document
 This report is the result of the job performed on the "Movielens" dataset. The objective is to design a machine learning model that predicts movie ratings for a given user that has not previously seen that movie, based on data such as previous ratings to other movies, user's preferences, etc. The level of efficiency of the model is measured as RMSE (Root Mean Square Error), which means the lowest it the best.
 
 ### Before you Begin: Prepare the Environment
-This code has been tested on a specific Anaconda environment created under Ubuntu 20.04 Linux Mate machine. All necessary scripts can be downloaded from the student's GitHub:
+This code has been tested on a specific Anaconda environment created on a Ubuntu 20.04 Linux Mate machine. All necessary scripts can be downloaded from the student's GitHub:
 
 * https://github.com/cirobr/ds9-capstone-movielens.git
 
-Next, the user should download and install Anaconda. With this package, we will create an isolated environment with the necessary packages, thus not interferring with the main packages of the PC:
+Next, the user should download and install Anaconda:
 
 * https://www.anaconda.com/products/individual-d
 
-Now it is time to create an environment named "r-gpu" with the help of two command lines:
+Now, it is time to create an environment named "r-gpu" with the help of two command lines typed on terminal:
 
 * conda create --name r-gpu python=3.9 notebook r-base=4.1 r-essentials r-e1071 r-irkernel r-varhandle r-foreach r-doparallel r-reticulate r-keras r-tfdatasets
 
 * Rscript install-keras-gpu.R
 
-Lastly, the below script executes the code provided by edX to generate the datasets and stores the files "edx.csv" and "validation.csv" on the subfolder "./dat".
+Lastly, the below script run on RStudio executes the code provided by edX to generate the datasets and stores the files "edx.csv" and "validation.csv" on a sub-folder "./dat", which is also created in the process:
 
-* Rscript code-preset.R
+* code-preset.R
 
-At this point, the code is ready for execution, for instance, on RStudio, through this script:
+At this point, the code is ready for execution on RStudio, through this script:
 
 * code-movielens.R
 
@@ -37,7 +37,7 @@ At this point, the code is ready for execution, for instance, on RStudio, throug
 
 The code is developed in such a way as to execute the following tasks:
 
-* Setup environment, libraries and define key functions, such as to calculate RMSE;
+* Setup the environment, libraries and define key functions, such as to calculate RMSE;
 * Read the edX dataset and split it on trainset / testset;
 * Create, train and evaluate the model (naive average and neural network);
 * Validate the model with the "validation" data set, and present the results.
@@ -49,9 +49,8 @@ The report will present all relevant outputs, as appropriate, in order to eviden
 
 #### Setup environment
 
-```{r}
+```{r warning=FALSE}
 # environment
-print("setup environment")
 library(reticulate)                         # interface R / Python
 use_condaenv("r-gpu", required = TRUE)      # conda env for running tf and keras on gpu
 
@@ -69,7 +68,7 @@ library(tfdatasets)
 numberOfDigits <- 5
 options(digits = numberOfDigits)
 proportionTestSet <- 0.20
-numberOfEpochs    <- 1 #20                    # keras training parameter
+numberOfEpochs    <- 20                    # keras training parameter
 
 # error function
 errRMSE <- function(true_ratings, predicted_ratings){
@@ -92,9 +91,9 @@ extractGenresNames <- function(elementVector){
 
 #### Read and pre-process the edX dataset
 
-In order to ensure the "validation" data set is not handled at all at th training stage, it is deleted from memory. Please recall that its correspondent CSV file is stored on hard drive. Next, the "edx" data set is loaded to memory.
+In order to ensure the "validation" data set is not handled at all at the training stage, it is deleted from memory. Please recall that its correspondent CSV file is stored on hard drive. Next, the "edx" data set is loaded to memory.
 
-```{r}
+```{r warning=FALSE}
 # clean memory
 if(exists("validation")) {rm(validation)}
 
@@ -114,7 +113,7 @@ Next, the following predictors will be extracted from the edX data set:
 
 * The column "genres" is a multiclass column that indicates the genre(s) of the movie that a given user has classified it. The code seeks for the available genres categories and creates a binary column for each of them.
 
-```{r}
+```{r warning=FALSE}
 # move ratings to first column
 edx2 <- edx %>% select(-c(rating))
 edx2 <- cbind(rating = edx$rating, edx2)
@@ -154,7 +153,7 @@ genresNames <- strsplit(edx$genres, "|", fixed = TRUE) %>%
 genresVector <- edx$genres
 df <- sapply(genresNames, extractGenresNames) %>% as_tibble()
 
-# remove hiphen from predictor names
+# remove hyphen from predictor names
 colnames(df)[7]  <- "SciFi"
 colnames(df)[16] <- "FilmNoir"
 colnames(df)[20] <- "NoGenre"
@@ -170,9 +169,8 @@ rm(df, edx)
 
 Next, the "edX" data set is split on trainset and testset. The resulting tables are then  verified for its correct stratification, with the aid of a chart that demonstrates the data splitting has also split each movie rating category, ranging between [0.5; 5.0], at approximately the same 80% trainset / 20% testset proportion.
 
-```{r}
+```{r warning=FALSE}
 # split train and test sets
-print("split edx in trainset/testset")
 set.seed(1, sample.kind = "Rounding")
 test_index <- createDataPartition(edx2$rating, 
                                   times = 1, 
@@ -200,9 +198,9 @@ p %>% ggplot(aes(rating, qty, fill = split)) +
 
 #### Pre processing of trainset
 
-The trainset is now pre processed for dimensionality reduction by eliminating the small variance predictors. This step is important as to reduce computational workload at the neual network processing steps.
+The trainset is now pre processed for dimensionality reduction by eliminating the small variance predictors. This step is important as it will reduce computational workload at the neural network processing steps.
 
-```{r}
+```{r warning=FALSE}
 # remove movies and users from testset that are not present on trainset
 test_set <- test_set %>%
   semi_join(train_set, by = "movieId") %>%
@@ -225,10 +223,9 @@ rm(p, p1, p2)
 
 #### First model: Naive Average
 
-Next, the naive average model is built as a baseline figure of merit forthe project, which means that further processing is expected to, as a minimum, to deliver performance better than achieved at this phase.
-```{r}
+Next, the naive average model is built as a baseline figure of merit for the project, which means that further processing is expected to, as a minimum, deliver performance better than achieved so far.
+```{r warning=FALSE}
 ### predict by global average
-print("bias predictions")
 mu <- mean(train_set$rating)
 predicted <- mu
 err <- RMSE(test_set$rating, predicted)
@@ -237,14 +234,14 @@ rmse_results <- tibble(model = "naiveAverage",
 rmse_results
 ```
 
-#### Dataset preparation for CNN
+#### Dataset preparation for neural network processing:
 
-The below code is a pre-processing of data for the forthcoming CNN (Convolutional Neural Network) data analysis. The following steps are taken:
+The below code is a pre-processing of data for the forthcoming neural network processing. The following steps are taken:
 
-* A "movie bias" and "user bias" indexes are extracted, hen merged to the train/test sets. The idea of extracting such features might allow the model to capture the "taste" of users to e.g. blockbusters, among others
+* A "movie bias" and "user bias" indexes are extracted, then merged to the train/test sets. The idea of extracting such features might allow the model to capture the "taste" of users to e.g. blockbusters, among others.
 
 
-```{r}
+```{r warning=FALSE}
 # add movie bias effect
 dfBiasMovie <- train_set %>%
   select(rating, movieId) %>%
@@ -275,13 +272,13 @@ head(df_train)
 rm(train_set, test_set)
 ```
 
-#### Second model: CNN
+#### Second model: Neural Network
 
-The code presented next takes the necessary steps to configure, compile, train and test a CNN (Convolutional Neural Network) model. This student has chosen to go through this way as a novel approach, in the sense that it has not been exploited at all in classes. An excellent online lecture about the theory behind neural networks can be found here:
+The code presented next takes the necessary steps to configure, compile, train and test a Neural Network model. This student has chosen to go through this way as a novel approach, in the sense that it has not been exploited at all in classes. An excellent online lecture about the theory behind neural networks can be found here:
 
 * https://youtu.be/Ih5Mr93E-2c
 
-The baseline package used for training the model is "Keras", which is a wrap for "Tensorflow". The technical reference for the programming with the package is found at the following links:
+The baseline package used for training the model is "Keras", which is a wrap for "Tensorflow". The technical reference for programming with the package is found at the following links:
 
 * https://cran.r-project.org/web/packages/keras/vignettes/index.html
 * https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/
@@ -291,7 +288,13 @@ The Keras package offers a variety of activation functions for its neurons. Howe
 
 Please note that the code can take +2h before it ends at an relatively usual Intel core i7 machine with GPU. At the end, the validation of result on each epoch is presented on a chart:
 
-```{r}
+```{r warning=FALSE}
+# scale predictors
+spec <- feature_spec(df_train, rating ~ . ) %>% 
+  step_numeric_column(all_numeric(), normalizer_fn = scaler_standard()) %>% 
+  fit()
+spec
+
 # wrap the model in a function
 build_model <- function() {
   # create model
@@ -346,11 +349,10 @@ history <- model %>% fit(
 plot(history)
 ```
 
-The prediction on the validation set is now performed, with an outcome RMSE at around 0.880.
+The prediction on the validation set is now performed:
 
-```{r}
+```{r warning=FALSE}
 # predict
-print("predict testset results")
 predicted <- model %>% predict(df_test %>% select(-c(rating)))
 predicted <- predicted[ , 1]
 
@@ -372,9 +374,8 @@ Given that we have a tested model, it is time to validate it. The "validation" d
 
 The validation set needs to be pre-processed before being used on predictions. This is accomplished in a similar way as for the trainset/testset before:
 
-```{r}
+```{r warning=FALSE}
 # read dataset from csv
-print("predict validation results")
 validation <- read_csv(file = "./dat/validation.csv") %>% as_tibble()
 head(validation)
 
@@ -428,6 +429,14 @@ rm(df, df_val, validation, predicted, validRows)
 
 ### Conclusions
 
+The student has demonstrated he has learned several skills from the classes that enabled him to pre-process data and exploit by himself the topic of "neural networks", that has not been covered during the course, and reaching to an RMSE of around 0.880, which is a significant improvement from the naive average approach.
+
 ### Next steps / Future work
+
+The student plans to go further on studying the following topics in more details, in order to improve the result of this task and all future tasks:
+* KNN;
+* PCA and SVM;
+* Neural Networks and the Keras package;
+* Ensembles.
 
 
