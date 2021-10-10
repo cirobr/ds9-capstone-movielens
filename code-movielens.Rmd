@@ -2,7 +2,9 @@
 title: "edX Capstone Movielens Project"
 author: "Ciro B Rosa"
 date: "27-Sep-2021"
-output: pdf_document
+output:
+  word_document: default
+  pdf_document: default
 ---
 
 ### Introduction and Objective
@@ -438,5 +440,3 @@ The student plans to go further on studying the following topics in more details
 * PCA and SVM;
 * Neural Networks and the Keras package;
 * Ensembles.
-
-
